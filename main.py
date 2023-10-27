@@ -17,7 +17,7 @@ def get_answer_for(question: str,knowledge_base:dict) -> str | None:
         if q["question"] == question:
             return q["answer"]
 def chat_bot():
-    knowledge_base: dict = load_knowledge_base('/home/josse/informatika/proyek python/knowledge_base.json')
+    knowledge_base: dict = load_knowledge_base('/home/josse/informatika/proyek python/output.json')
     while True:
         user_input: str = input('You :')
 
