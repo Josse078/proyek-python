@@ -9,6 +9,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import spacy  
 from sentence_transformers import SentenceTransformer, util  
+import bot
+#MTE3MDM1MTI2OTYzOTA5ODQyOQ.GQAUyk.HN0HVaw9PHhMqRQnlcglh0IU4MVcHO-cKwPxRA
+
 
 
 tokenizer = BertTokenizer.from_pretrained("indobenchmark/indobert-base-p1")
@@ -17,14 +20,12 @@ sentence_model = SentenceTransformer('bert-base-nli-mean-tokens')
 nlp = spacy.load("en_core_web_sm")
 def preprocess_text(text):
     doc = nlp(text)
-    tokens = [token.text for token in doc if not token.is_stop]
+    tokens = [token.lemma_ for token in doc if not token.is_stop]
     return " ".join(tokens)
-
 def load_knowledge_base(file_path:str) -> dict:
     with open(file_path,'r') as file:
         data : dict = json.load(file)
     return data
-
 def find_similar_question(user_question, dataset):
     vectorizer = TfidfVectorizer()
     question_vectors = vectorizer.fit_transform([user_question])
@@ -48,32 +49,19 @@ def get_answer_for(question: str,knowledge_base:dict) -> str | None:
         if q["question"] == question:
             return q["answer"]
 
-
 def answer_question(question, dataset):
     similar_question = find_similar_question(question, dataset)
-    user_input = preprocess_text(question)  
-    user_input_embedding = sentence_model.encode(user_input)
-
-    question_embeddings = [sentence_model.encode(preprocess_text(entry['question'])) for entry in dataset]
-    similarities = util.pytorch_cos_sim(user_input_embedding, question_embeddings)
-
-    most_similar_index = similarities.argmax()
-    most_similar_question = dataset[most_similar_index]['question']
-    most_similar_answer = dataset[most_similar_index]['answer']
-
-    if similarities[most_similar_index] > 0.6:  
-        return most_similar_answer
+    user_input = preprocess_text(question) 
     for entry in dataset:
         if similar_question.lower() == entry['question'].lower() or similar_question.lower() == entry['answer'].lower():
             return entry['answer']
-
-    inputs = tokenizer(question, similar_question, return_tensors="pt", padding=True, truncation=True)
-    start_scores, end_scores = model(**inputs)
+    inputs = tokenizer(user_input, similar_question, return_tensors="pt", padding=True, truncation=True)
+    start_scores, end_scores = model(inputs)
     start_index = torch.argmax(start_scores)
     end_index = torch.argmax(end_scores)
-    answer = tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(inputs["input_ids"][0][start_index:end_index + 1]))
-
+    answer = tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(inputs["input_ids"][start_index:end_index + 1]))
     return answer if answer else "I'm not sure how to answer that."
+    
 def load_qa_dataset(file_path):
     dataset = []
     with open(file_path, 'r', newline='') as csv_file:
@@ -95,3 +83,7 @@ def chat_bot(dataset):
         print(f'Bot: {answer}')
 if __name__ == '__main__':
     chat_bot(qa_dataset)
+
+if __name__ == '__main__':
+    bot.run_discord_bot()
+
