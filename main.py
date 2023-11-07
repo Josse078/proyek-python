@@ -9,10 +9,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import spacy  
 from sentence_transformers import SentenceTransformer, util  
-import bot
-#MTE3MDM1MTI2OTYzOTA5ODQyOQ.GQAUyk.HN0HVaw9PHhMqRQnlcglh0IU4MVcHO-cKwPxRA
-
-
+from googlesearch import search
+import requests
+from bs4 import BeautifulSoup
+import re
+import textwrap
 
 tokenizer = BertTokenizer.from_pretrained("indobenchmark/indobert-base-p1")
 model = BertForQuestionAnswering.from_pretrained("indobenchmark/indobert-base-p1")
@@ -51,17 +52,24 @@ def get_answer_for(question: str,knowledge_base:dict) -> str | None:
 
 def answer_question(question, dataset):
     similar_question = find_similar_question(question, dataset)
-    user_input = preprocess_text(question) 
-    for entry in dataset:
-        if similar_question.lower() == entry['question'].lower() or similar_question.lower() == entry['answer'].lower():
-            return entry['answer']
-    inputs = tokenizer(user_input, similar_question, return_tensors="pt", padding=True, truncation=True)
-    start_scores, end_scores = model(inputs)
-    start_index = torch.argmax(start_scores)
-    end_index = torch.argmax(end_scores)
-    answer = tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(inputs["input_ids"][start_index:end_index + 1]))
-    return answer if answer else "I'm not sure how to answer that."
-    
+    user_input = preprocess_text(question)
+
+    if similar_question is not None:
+        for entry in dataset:
+            if similar_question.lower() == entry['question'].lower() or similar_question.lower() == entry['answer'].lower():
+                return entry['answer']
+
+    google_results = list(search(question, num_results=5))
+
+    search_links = []
+    for result in google_results:
+        search_links.append(result)
+
+    if search_links:
+        return f"I couldn't find a similar question in my knowledge base. Here are some relevant search results on Google:\n{', '.join(search_links)}"
+    else:
+        return "I'm not sure how to answer that."
+
 def load_qa_dataset(file_path):
     dataset = []
     with open(file_path, 'r', newline='') as csv_file:
@@ -72,8 +80,8 @@ def load_qa_dataset(file_path):
             dataset.append({'question': question, 'answer': answer})
             dataset.append({'question': answer, 'answer': question})  
     return dataset
-qa_dataset = load_qa_dataset('/home/josse/informatika/proyek python/databases/merged_file.csv')
-#qa_dataset = load_qa_dataset('/home/josse/informatika/proyek python/databases/irrelevant datas/Conversation.csv')
+#qa_dataset = load_qa_dataset('/home/josse/informatika/proyek python/databases/merged_file.csv')
+qa_dataset = load_qa_dataset('/home/josse/informatika/proyek python/databases/irrelevant datas/Conversation.csv')
 def chat_bot(dataset):
     while True:
         user_input = input('You: ')
@@ -84,6 +92,4 @@ def chat_bot(dataset):
 if __name__ == '__main__':
     chat_bot(qa_dataset)
 
-if __name__ == '__main__':
-    bot.run_discord_bot()
 
