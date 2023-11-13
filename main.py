@@ -50,10 +50,12 @@ def find_similar_question(user_question, dataset):
             most_similar_question = entry['question']
     return most_similar_question
 
-def save_knowledge_base(file_path:str, data:dict):
-    with open(file_path, 'w') as file: 
-        json.dump(data, file, indent=2)
-
+def save_knowledge_base(file_path: str, dataset: list):
+    with open(file_path, 'w', newline='') as csv_file:
+        fieldnames = ['question', 'answer']
+        csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        csv_writer.writeheader()
+        csv_writer.writerows(dataset)
 def find_best_match(user_question:str, questions:list[str]) -> str | None:
     matches:list = get_close_matches(user_question, questions, n=1, cutoff=0.6)
     return matches[0] if matches else None
@@ -96,29 +98,33 @@ def load_qa_dataset(file_path):
             dataset.append({'question': answer, 'answer': question})  
     return dataset
 
-def chat_bot(dataset, knowledge_base_path):
+
+def chat_bot(dataset, csv_file_path):
     while True:
         user_input = input('You: ')
         if user_input.lower() == 'quit':
             break
 
-       
         answer = answer_question(user_input, dataset)
 
-        
         edit_response = input(f'Bot: {answer}\nIs this response accurate? (yes/no): ').lower()
 
         if edit_response == 'no':
             edited_response = input('Please provide the corrected response: ')
-           
-            dataset.append({'question': user_input, 'answer': edited_response})
-           
-            save_knowledge_base(knowledge_base_path, {'questions': dataset})
-            print('Thank you for the correction. The knowledge base has been updated.')
+
+            # Find the index of the inaccurate response in the dataset
+            index_to_remove = next((i for i, entry in enumerate(dataset) if entry['answer'] == answer), None)
+
+            if index_to_remove is not None:
+                # Remove the row where the inaccurate answer was obtained
+                del dataset[index_to_remove]
+                save_knowledge_base(csv_file_path, dataset)
+                print('Thank you for the correction. The knowledge base has been updated.')
+            else:
+                print('Error: Could not find the inaccurate answer in the dataset.')
 
         print(f'Bot: {answer}')
-
 if __name__ == '__main__':
-    qa_dataset = load_qa_dataset('/home/josse/informatika/proyek python/databases/irrelevant datas/Conversation.csv')
-    knowledge_base_path = "knowledge_base.json"
-    chat_bot(qa_dataset, knowledge_base_path)
+    qa_dataset_path = '/home/josse/informatika/proyek python/databases/merged_file2.csv'
+    qa_dataset = load_qa_dataset(qa_dataset_path)
+    chat_bot(qa_dataset, qa_dataset_path)
